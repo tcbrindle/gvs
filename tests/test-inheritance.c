@@ -1,3 +1,7 @@
+/*
+ * Tests that serialization works correctly with inheritance, including property
+ * overrides
+ */
 
 #include <gvs/gvs.h>
 
