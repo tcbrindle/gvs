@@ -1,9 +1,11 @@
 noinst_PROGRAMS =
 noinst_PROGRAMS += test-basic
 noinst_PROGRAMS += test-inheritance
+noinst_PROGRAMS += test-object
 
 TEST_PROGS += test-basic
 TEST_PROGS += test-inheritance
+TEST_PROGS += test-object
 
 test_basic_SOURCES = $(top_srcdir)/tests/test-basic.c
 test_basic_CPPFLAGS = $(GOBJECT_CFLAGS)
@@ -13,3 +15,6 @@ test_inheritance_SOURCES = $(top_srcdir)/tests/test-inheritance.c
 test_inheritance_CPPFLAGS = $(GOBJECT_CFLAGS)
 test_inheritance_LDADD = $(GOBJECT_LIBS) $(top_builddir)/libgvs-1.0.la
 
+test_object_SOURCES = $(top_srcdir)/tests/test-object.c
+test_object_CPPFLAGS = $(GOBJECT_CFLAGS)
+test_object_LDADD = $(GOBJECT_LIBS) $(top_builddir)/libgvs-1.0.la
