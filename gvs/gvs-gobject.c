@@ -247,7 +247,7 @@ deserialize_flags(GVariant *variant, GValue *value)
 static const GVariantType *
 get_variant_type_for_object_type(GType type)
 {
-    return G_VARIANT_TYPE_VARDICT;
+    return (const GVariantType *) "(sa{sv})";
 }
 
 static GVariant *
@@ -262,7 +262,12 @@ serialize_object(const GValue *value)
 static void
 deserialize_object(GVariant *variant, GValue *value)
 {
-    g_value_take_object(value, gvs_gobject_new_deserialize(variant));
+    GVariant *child = g_variant_get_maybe(variant);
+
+    if (child)
+        g_value_take_object(value, gvs_gobject_new_deserialize(child));
+    else
+        g_value_set_object(value, NULL);
 }
 
 

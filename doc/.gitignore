@@ -1,6 +1,6 @@
 *.txt
 *.stamp
-gom.*
+gvs.*
 html
 tmpl
 version.xml

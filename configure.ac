@@ -105,7 +105,7 @@ dnl Use intltools.
 dnl -------------------------------------------------------------------
 IT_PROG_INTLTOOL([0.40.0])
 
-AC_SUBST([GETTEXT_PACKAGE], [gom])
+AC_SUBST([GETTEXT_PACKAGE], [gvs])
 AC_DEFINE([GETTEXT_PACKAGE], [PACKAGE_TARNAME], [Define to the gettext package name.])
 
 

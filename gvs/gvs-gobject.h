@@ -20,7 +20,7 @@
 #define __GVS_GOBJECT_H__
 
 #if !defined (__GVS_INSIDE__)
-#error "Only <gom.h> can be included directly."
+#error "Only <gvs.h> can be included directly."
 #endif
 
 #include <glib-object.h>
