@@ -290,11 +290,13 @@ test_derived_init(TestDerived *self)
 
 
 static const char serialized_object[] = 
-"('TestDerived', {'int-prop': <17>,"
-"                 'dbl-prop': <3.1415926535897931>,"
-"                 'float-prop': <1.5707963705062866>,"
-"                 'str-prop': <@ms 'GVS Test'>,"
-"                 'uint64-prop': <uint64 4>})";
+"[('TestDerived', <{"
+"    'int-prop': <17>,"
+"    'dbl-prop': <3.1415926535897931>,"
+"    'float-prop': <1.5707963705062866>,"
+"    'str-prop': <@ms 'GVS Test'>,"
+"    'uint64-prop': <uint64 4>"
+"}>)]";
 
 static void
 test_serialize(void)
@@ -303,6 +305,7 @@ test_serialize(void)
     TestDerived *item2 = NULL;
     GVariant *variant1 = NULL;
     GVariant *variant2 = NULL;
+    GError *error = NULL;
 
     item1 = g_object_new(TEST_TYPE_DERIVED,
                          "int-prop", 17,
@@ -312,9 +315,11 @@ test_serialize(void)
                           NULL);
 
     variant1 = gvs_gobject_serialize(G_OBJECT(item1));
+    //g_print("%s\n", g_variant_print(variant1, TRUE));
     g_assert(variant1);
 
-    variant2 = g_variant_parse(NULL, serialized_object, NULL, NULL, NULL);
+    variant2 = g_variant_parse(NULL, serialized_object, NULL, NULL, &error);
+    g_assert_no_error(error);
     g_assert(variant2);
 
     g_assert(g_variant_equal(variant1, variant2));

@@ -23,14 +23,13 @@
 #error "Only <gvs.h> can be included directly."
 #endif
 
-#include <glib-object.h>
+#include "gvs-deserializer.h"
+#include "gvs-serializer.h"
 
 G_BEGIN_DECLS
 
-typedef GVariant *(*GvsPropertySerializeFunc)  (const GValue *value);
-
-typedef void      (*GvsPropertyDeserializeFunc) (GVariant *variant,
-                                                 GValue *value);
+GQuark       gvs_property_serialize_func_quark   (void) G_GNUC_CONST;
+GQuark       gvs_property_deserialize_func_quark (void) G_GNUC_CONST;
 
 void         gvs_register_property_serialize_func(GParamSpec *pspec,
                                                   GvsPropertySerializeFunc serialize);
@@ -48,17 +47,7 @@ void         gvs_register_property_deserialize_func_full(GParamSpec *pspec,
                                                          gpointer user_data,
                                                          GDestroyNotify destroy_notify);
 
-GVariant    *gvs_gobject_serialize_property_by_pspec(GParamSpec *pspec,
-                                                     GValue     *value);
-
-void         gvs_gobject_deserialize_property(GObject *object,
-                                              const char *property_name,
-                                              GVariant *variant);
-
 GVariant    *gvs_gobject_serialize(GObject *object);
-
-void         gvs_gobject_deserialize(GObject *object,
-                                     GVariant *variant);
 
 gpointer     gvs_gobject_new_deserialize(GVariant *variant);
 

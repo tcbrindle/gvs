@@ -25,8 +25,10 @@ G_BEGIN_DECLS
 
 #define __GVS_INSIDE__
 
+#include "gvs-deserializer.h"
 #include "gvs-gobject.h"
 #include "gvs-serializable.h"
+#include "gvs-serializer.h"
 
 #undef __GVS_INSIDE__
 

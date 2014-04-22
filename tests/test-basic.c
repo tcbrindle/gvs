@@ -175,10 +175,12 @@ assert_items_identical(TestItem *item1, TestItem *item2)
 }
 
 static const char serialised_object[] = 
-"('TestItem', {'int-prop': <17>,"
-"              'dbl-prop': <3.1415926535897931>,"
-"              'float-prop': <1.5707963705062866>,"
-"              'str-prop': <@ms nothing>})";
+"[('TestItem', <{"
+"    'int-prop': <17>,"
+"    'dbl-prop': <3.1415926535897931>,"
+"    'float-prop': <1.5707963705062866>,"
+"    'str-prop': <@ms nothing>"
+"}>)]";
 
 static void
 test_serialize(void)

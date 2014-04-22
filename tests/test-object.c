@@ -155,16 +155,11 @@ assert_items_identical(TestItem *item1, TestItem *item2)
 }
 
 static char serialized_object[] = 
-"('TestItem', {"
-"    'child': <@m(sa{sv}) ('TestItem', {"
-"        'child': <@m(sa{sv}) ('TestItem', {"
-"            'child': <@m(sa{sv}) nothing>,"
-"            'name': <@ms 'grandchild'>"
-"         })>,"
-"        'name': <@ms 'child'>"
-"         })>,"
-"    'name': <@ms 'parent'>"
-"})";
+"["
+"    ('TestItem', <{'child': <@mt 1>, 'name': <@ms 'parent'>}>),"
+"    ('TestItem', <{'child': <@mt 2>, 'name': <@ms 'child'>}>),"
+"    ('TestItem', <{'child': <@mt nothing>, 'name': <@ms 'grandchild'>}>)"
+"]";
 
 
 static void
@@ -187,6 +182,9 @@ test_serialize(void)
     g_object_set(child, "child", grandchild, NULL);
 
     variant1 = gvs_gobject_serialize(G_OBJECT(parent));
+    g_assert(variant1);
+
+    //g_print("%s\n", g_variant_print(variant1, TRUE));
     
     variant2 = g_variant_parse(NULL, serialized_object, NULL, NULL, &error);
     g_assert_no_error(error);
