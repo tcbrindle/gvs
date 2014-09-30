@@ -135,7 +135,7 @@ dnl **************************************************************************
 dnl Miscellaneous
 dnl **************************************************************************
 GOBJECT_INTROSPECTION_CHECK([1.30.0])
-
+VAPIGEN_CHECK([0.20.0])
 
 dnl **************************************************************************
 dnl Output
@@ -157,5 +157,6 @@ echo "  Debug Level................: ${enable_debug}"
 echo "  Compiler Flags.............: ${CFLAGS}"
 echo "  Enable API Reference.......: ${enable_gtk_doc}"
 echo "  Enable Introspection.......: ${found_introspection}"
+echo "  Enable VAPI generation ....: ${enable_vala}"
 echo "  Enable Test Suite..........: ${enable_glibtest}"
 echo ""
