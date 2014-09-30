@@ -234,6 +234,10 @@ deserialize_pspec(GvsDeserializer *self, GParamSpec *pspec, GVariant *variant, G
         {
             func = deserialize_object;
         }
+        else if (G_TYPE_IS_INTERFACE(type))
+        {
+            func = deserialize_object;
+        }
         else
         {
             func = lookup_builtin_transform(type)->deserialize;

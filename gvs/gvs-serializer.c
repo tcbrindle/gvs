@@ -234,6 +234,10 @@ serialize_pspec(GvsSerializer *self, GParamSpec *pspec, const GValue *value)
         {
             func = serialize_object;
         }
+        else if (G_TYPE_IS_INTERFACE(type))
+        {
+            func = serialize_object;
+        }
         else
         {
             func = lookup_builtin_transform(type)->serialize;
