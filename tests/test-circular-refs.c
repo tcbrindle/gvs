@@ -167,8 +167,9 @@ test_item_new(const char* name)
 }
 
 static const char serialized_object[] =
+"(uint32 1735816047, uint16 1,"
 "[('TestItem', <{'child': <@mt 1>, 'parent': <@mt nothing>, 'name': <@ms 'parent'>}>),"
-" ('TestItem', <{'child': <@mt nothing>, 'parent': <@mt 0>, 'name': <@ms 'child'>}>)]";
+" ('TestItem', <{'child': <@mt nothing>, 'parent': <@mt 0>, 'name': <@ms 'child'>}>)])";
 
 
 static void

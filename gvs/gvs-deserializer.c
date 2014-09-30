@@ -32,6 +32,9 @@ struct _GvsDeserializerPrivate
 #define GVS_ENTITY_TYPE            ((const GVariantType*) "(sv)")
 #define GVS_ENTITY_REF_TYPE        ((const GVariantType*) "u")
 #define GVS_ENTITY_ARRAY_TYPE      ((const GVariantType*) "a(sv)")
+#define GVS_SERIALIZED_OBJECT_TYPE ((const GVariantType*) "(uqa(sv))")
+#define GVS_MAGIC_NUMBER           ((guint32) 0x6776736F) /*'gvso'*/
+#define GVS_PROTOCOL_VERSION       ((guint16) 1)
 
 static gpointer get_entity(GvsDeserializer *self, gsize id);
 
@@ -313,7 +316,7 @@ gvs_create_object_default(GvsDeserializer *self, GType class_type, GVariant *var
         GVariant *pvariant = NULL;
         GParameter param = { 0, };
 
-        /* Only handly construct-only properties */
+        /* Only handle construct-only properties here*/
         if ((pspec->flags & G_PARAM_CONSTRUCT_ONLY) == 0)
             continue;
 
@@ -336,6 +339,7 @@ gvs_create_object_default(GvsDeserializer *self, GType class_type, GVariant *var
                            params->len,
                            (GParameter *) params->data);
 
+    g_free(pspecs);
     g_array_free(params, TRUE);
     g_type_class_unref(gobject_class);
 
@@ -355,6 +359,8 @@ deserialize_entity(GvsDeserializer *self, gsize index)
     g_variant_get_child(priv->toplevel, index, "(sv)", NULL, &child);
 
     gvs_deserialize_object_default(self, object, child);
+
+    g_variant_unref(child);
 }
 
 static gpointer
@@ -434,12 +440,28 @@ gvs_deserializer_deserialize(GvsDeserializer *self, GVariant *variant)
     GvsDeserializerPrivate *priv = self->priv;
     gsize n_entities, i;
     gpointer object;
+    guint32 magic_number;
+    guint16 protocol_version;
     
     g_return_val_if_fail(GVS_IS_DESERIALIZER(self), NULL);
-    g_return_val_if_fail(g_variant_is_of_type(variant, GVS_ENTITY_ARRAY_TYPE), NULL);
+    g_return_val_if_fail(g_variant_is_of_type(variant, GVS_SERIALIZED_OBJECT_TYPE), NULL);
 
-    priv->toplevel = variant;
-    n_entities = g_variant_n_children(variant);
+    /* Check magic number is correct */
+    g_variant_get_child(variant, 0, "u", &magic_number);
+    g_return_val_if_fail(magic_number == GVS_MAGIC_NUMBER, NULL);
+
+    /* Check the protocol version (currently must be 1) */
+    g_variant_get_child(variant, 1, "q", &protocol_version);
+    if (protocol_version != 1)
+    {
+        g_critical("This version of libgvs cannot deserialize GVS protocol version %i\n",
+                   protocol_version);
+        return NULL;
+    }
+
+    /* Go ahead and start unpacking the array */
+    priv->toplevel = g_variant_get_child_value(variant, 2);
+    n_entities = g_variant_n_children(priv->toplevel);
     priv->entities = g_new0(gpointer, n_entities);
 
     /* We do deserialization in two stages.*/
@@ -458,6 +480,7 @@ gvs_deserializer_deserialize(GvsDeserializer *self, GVariant *variant)
 
     object = priv->entities[0];
 
+    g_variant_unref(priv->toplevel);
     g_free(priv->entities);
 
     return object;

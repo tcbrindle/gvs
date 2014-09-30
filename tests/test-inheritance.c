@@ -289,14 +289,16 @@ test_derived_init(TestDerived *self)
 }
 
 
-static const char serialized_object[] = 
+static const char serialized_object[] =
+"(uint32 1735816047,"
+" uint16 1,"
 "[('TestDerived', <{"
 "    'int-prop': <17>,"
 "    'dbl-prop': <3.1415926535897931>,"
 "    'float-prop': <1.5707963705062866>,"
 "    'str-prop': <@ms 'GVS Test'>,"
 "    'uint64-prop': <uint64 4>"
-"}>)]";
+"}>)])";
 
 static void
 test_serialize(void)

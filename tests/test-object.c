@@ -155,11 +155,13 @@ assert_items_identical(TestItem *item1, TestItem *item2)
 }
 
 static char serialized_object[] = 
+"(uint32 1735816047,"
+" uint16 1,"
 "["
 "    ('TestItem', <{'child': <@mt 1>, 'name': <@ms 'parent'>}>),"
 "    ('TestItem', <{'child': <@mt 2>, 'name': <@ms 'child'>}>),"
 "    ('TestItem', <{'child': <@mt nothing>, 'name': <@ms 'grandchild'>}>)"
-"]";
+"])";
 
 
 static void

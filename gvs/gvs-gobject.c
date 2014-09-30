@@ -111,6 +111,8 @@ gvs_gobject_new_deserialize(GVariant *variant)
     deserializer = gvs_deserializer_new();
 
     object = gvs_deserializer_deserialize(deserializer, variant);
+
+    g_object_unref(deserializer);
     
     return object;
 }

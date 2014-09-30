@@ -34,6 +34,9 @@ struct _GvsSerializerPrivate
 #define GVS_ENTITY_TYPE            ((const GVariantType*) "(sv)")
 #define GVS_ENTITY_REF_TYPE        G_VARIANT_TYPE_UINT64
 #define GVS_ENTITY_ARRAY_TYPE      ((const GVariantType*) "a(sv)")
+#define GVS_SERIALIZED_OBJECT_TYPE ("(uq@a(sv))")
+#define GVS_MAGIC_NUMBER           ((guint32) 0x6776736F) /*'gvso'*/
+#define GVS_PROTOCOL_VERSION       ((guint16) 1)
 
 /******************************************************************************
  *
@@ -159,7 +162,8 @@ serialize_fundamental(GvsSerializer *self, const GValue *value, gpointer unused)
             break;
       }
 
-      return g_variant_ref_sink(variant);
+      //return g_variant_ref_sink(variant);
+    return variant;
 }
 
 /*
@@ -375,12 +379,12 @@ gvs_serializer_serialize_object(GvsSerializer *self, GObject *object)
 {
     GvsSerializerPrivate *priv;
     GVariant *variant = NULL;
+    GVariant *array = NULL;
 
     g_return_val_if_fail(GVS_IS_SERIALIZER(self), NULL);
     g_return_val_if_fail(G_IS_OBJECT(object), NULL);
 
     priv = self->priv;
-
 
     priv->builder = g_variant_builder_new(GVS_ENTITY_ARRAY_TYPE);
     priv->entity_map = g_hash_table_new_full(g_direct_hash, g_direct_equal,
@@ -398,8 +402,12 @@ gvs_serializer_serialize_object(GvsSerializer *self, GObject *object)
         }
     }
 
-    variant = g_variant_builder_end(priv->builder);
-    g_variant_ref_sink(variant);
+    array = g_variant_builder_end(priv->builder);
+
+    variant = g_variant_new(GVS_SERIALIZED_OBJECT_TYPE,
+                            GVS_MAGIC_NUMBER,
+                            GVS_PROTOCOL_VERSION,
+                            array);
 
     g_hash_table_destroy(priv->entity_map);
     g_variant_builder_unref(priv->builder);
