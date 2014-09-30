@@ -29,13 +29,20 @@ test_circular_refs_LDADD = $(GOBJECT_LIBS) $(top_builddir)/libgvs-1.0.la
 if ENABLE_VAPIGEN
 
 noinst_PROGRAMS += test-basic-vala
+noinst_PROGRAMS += test-interfaces-vala
 
 TEST_PROGS += test-basic-vala
+TEST_PROGS += test-interfaces-vala
 
 test_basic_vala_SOURCES = $(top_srcdir)/tests/test-basic-vala.vala
 test_basic_vala_VALAFLAGS = --vapidir $(top_srcdir) --pkg gvs-1.0 --debug
 test_basic_vala_CPPFLAGS = $(GOBJECT_CFLAGS)
 test_basic_vala_LDADD = $(GOBJECT_LIBS) $(top_builddir)/libgvs-1.0.la
+
+test_interfaces_vala_SOURCES = $(top_srcdir)/tests/test-interfaces-vala.vala
+test_interfaces_vala_VALAFLAGS = --vapidir $(top_srcdir) --pkg gvs-1.0 --debug
+test_interfaces_vala_CPPFLAGS = $(GOBJECT_CFLAGS)
+test_interfaces_vala_LDADD = $(GOBJECT_LIBS) $(top_builddir)/libgvs-1.0.la
 
 endif #enable vala
 
