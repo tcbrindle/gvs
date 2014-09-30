@@ -54,4 +54,27 @@ typelib_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
 
 CLEANFILES = $(gir_DATA) $(typelib_DATA)
 
+if ENABLE_VAPIGEN
+
+-include $(VAPIGEN_MAKEFILE)
+
+gvs-1.0.vapi: Gvs-1.0.gir gvs-1.0.deps
+
+VAPIGEN_VAPIS = gvs-1.0.vapi
+
+gvs_1_0_vapi_DEPS =
+gvs_1_0_vapi_METADATADIRS = $(top_srcdir)
+gvs_1_0_vapi_FILES = Gvs-1.0.gir
+
+VAPI_DEPS = $(VAPIGEN_VAPIS:.vapi=.deps)
+
+gvs-1.0.deps: Makefile.am
+	$(AM_V_GEN) echo $(gom_1_0_vapi_DEPS) | tr ' ' '\n' > $@
+
+vapidir = $(datadir)/vala/vapi
+vapi_DATA = $(VAPIGEN_VAPIS) $(VAPI_DEPS)
+
+CLEANFILES += $(vapi_DATA)
+
+endif # ENABLE_VAPIGEN
 endif # HAVE_INTROSPECTION
