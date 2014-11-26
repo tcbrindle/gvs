@@ -46,26 +46,30 @@ struct _GvsSerializerPrivate
 
 typedef struct
 {
-    GType type;
     gsize id;
+    GValue value;
 } EntityRef;
 
 static EntityRef *
-entity_ref(GType type, gsize id)
+make_entity_ref(gsize id, const GValue *value)
 {
     EntityRef *ref = g_slice_new(EntityRef);
-    ref->type = type;
     ref->id = id;
+    g_value_init(&ref->value, G_VALUE_TYPE (value));
+    g_value_copy(value, &ref->value);
+
     return ref;
 }
 
 static void
-entity_ref_free(gpointer ref)
+entity_ref_free(gpointer ptr)
 {
+    EntityRef *ref = ptr;
+    g_value_reset(&ref->value);
     g_slice_free(EntityRef, ref);
 }
 
-static GVariant *get_entity_ref(GvsSerializer *self, gpointer entity, GType entity_type);
+static GVariant *get_entity_ref(GvsSerializer *self, const GValue *value);
 
 /******************************************************************************
  *
@@ -82,17 +86,42 @@ static GVariant *get_entity_ref(GvsSerializer *self, gpointer entity, GType enti
 static GVariant *
 strv_serialize(GvsSerializer *self, const GValue *value, gpointer unused)
 {
-    return g_variant_new_strv(g_value_get_boxed(value), -1);
+    const char * const * strv = g_value_get_boxed(value);
+    return g_variant_new_strv(strv, g_strv_length((GStrv) strv));
+}
+
+static GVariant *
+bytes_serialize(GvsSerializer *self, const GValue *value, gpointer unused)
+{
+    gsize size, i;
+    const guint8 *data;
+    GVariantBuilder builder;
+
+    data = g_bytes_get_data(g_value_get_boxed(value), &size);
+
+    /* Hmmm, g_variant_new_bytestring for some reason wants the incoming
+     * data to be nul-terminated, which of course a generic chunk of data
+     * in the form of bytes might not be. So we have to manually go through
+     * and create the byte array ourselves. */
+    g_variant_builder_init(&builder, G_VARIANT_TYPE_BYTESTRING);
+    for (i = 0; i < size; i++)
+    {
+        g_variant_builder_add_value(&builder, g_variant_new_byte(data[i]));
+    }
+
+    return g_variant_builder_end(&builder);
 }
 
 typedef struct
 {
     const char *gtype_name;
+    const GVariantType *variant_type;
     GvsPropertySerializeFunc serialize;
 } BuiltinTransform;
 
 static const BuiltinTransform builtin_transforms[] = {
-    { "GStrv",  strv_serialize },
+    { "GStrv",  G_VARIANT_TYPE_STRING_ARRAY, strv_serialize },
+    { "GBytes", G_VARIANT_TYPE_BYTESTRING, bytes_serialize },
     { NULL, }
 };
 
@@ -108,6 +137,18 @@ lookup_builtin_transform(GType type)
     }
 
     return NULL;
+}
+
+static GVariant *
+serialize_boxed_property(GvsSerializer *self, const GValue *value, gpointer unused)
+{
+    gpointer object = g_value_get_boxed(value);
+    GVariant *ref = NULL;
+
+    if (object)
+        ref = get_entity_ref(self, value);
+
+    return g_variant_new_maybe(GVS_ENTITY_REF_TYPE, ref);
 }
 
 /*
@@ -162,7 +203,6 @@ serialize_fundamental(GvsSerializer *self, const GValue *value, gpointer unused)
             break;
       }
 
-      //return g_variant_ref_sink(variant);
     return variant;
 }
 
@@ -189,13 +229,21 @@ serialize_flags(GvsSerializer *self, const GValue *value, gpointer unused)
  *
  */
 static GVariant *
-serialize_object(GvsSerializer *self, const GValue *value, gpointer unused)
+serialize_object_property(GvsSerializer *self, const GValue *value, gpointer unused)
 {
     gpointer object = g_value_get_object(value);
     GVariant *ref = NULL;
 
     if (object)
-        ref = get_entity_ref(self, object, G_VALUE_TYPE(value));
+    {
+    	/* The passed GValue has the declared type of the property; we want to
+     	 * record the type of the actual instance */
+        GValue derived_value = G_VALUE_INIT;
+        g_value_init (&derived_value, G_TYPE_FROM_INSTANCE (object));
+        g_value_set_object (&derived_value, object);
+        ref = get_entity_ref(self, &derived_value);
+        g_value_reset (&derived_value);
+    }
 
     return g_variant_new_maybe(GVS_ENTITY_REF_TYPE, ref);
 }
@@ -230,17 +278,13 @@ serialize_pspec(GvsSerializer *self, GParamSpec *pspec, const GValue *value)
         {
             func = serialize_flags;
         }
-        else if (G_TYPE_IS_OBJECT(type))
+        else if (G_TYPE_IS_OBJECT(type) || G_TYPE_IS_INTERFACE (type))
         {
-            func = serialize_object;
+            func = serialize_object_property;
         }
-        else if (G_TYPE_IS_INTERFACE(type))
+        else if (g_type_is_a(type, G_TYPE_BOXED))
         {
-            func = serialize_object;
-        }
-        else
-        {
-            func = lookup_builtin_transform(type)->serialize;
+            func = serialize_boxed_property;
         }
     }
 
@@ -259,12 +303,15 @@ serialize_pspec(GvsSerializer *self, GParamSpec *pspec, const GValue *value)
 }
 
 static GVariant *
-serialize_object_default(GvsSerializer *self, GObject *object)
+serialize_object_default(GvsSerializer *self, EntityRef *ref)
 {
     GObjectClass *klass;
     guint n_props, i;
     GParamSpec **pspecs;
     GVariantBuilder builder;
+    GObject *object;
+
+    object = g_value_get_object(&ref->value);
 
     g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
 
@@ -300,64 +347,90 @@ serialize_object_default(GvsSerializer *self, GObject *object)
     return g_variant_builder_end (&builder);
 }
 
+static GVariant *
+serialize_boxed_default(GvsSerializer *self, EntityRef *ref)
+{
+    GVariant *variant = NULL;
+    const BuiltinTransform *transform;
+
+    transform = lookup_builtin_transform(G_VALUE_TYPE(&ref->value));
+
+    if (g_value_peek_pointer(&ref->value) && transform)
+    {
+        variant = transform->serialize(self, &ref->value, NULL);
+    }
+
+    return variant;
+}
+
 static void
-serialize_entity(GvsSerializer *self, gpointer entity)
+serialize_entity(GvsSerializer *self, EntityRef *ref)
 {
     GvsSerializerPrivate *priv = self->priv;
-
-    GObject *object = G_OBJECT(entity);
+    GType type = G_VALUE_TYPE(&ref->value);
     
     /* Now, create our new object. This is type "(sv)" */
     g_variant_builder_open(priv->builder, GVS_ENTITY_TYPE);
     
     /* First, add GType name */
-    g_variant_builder_add(priv->builder, "s",
-                          g_type_name (G_TYPE_FROM_INSTANCE (object)));
+    g_variant_builder_add(priv->builder, "s", g_type_name(type));
 
-    /* Then add the serialized object itself */
-    /* TODO: Handle GvsSerializable here */
-    g_variant_builder_add(priv->builder, "v",
-                          serialize_object_default(self, object));
+    /* Then add the serialized item itself */
+    if (g_type_is_a(type, G_TYPE_OBJECT))
+    {
+        g_variant_builder_add(priv->builder, "v",
+                              serialize_object_default(self, ref));
+    }
+    else if (g_type_is_a(type, G_TYPE_BOXED))
+    {
+        g_variant_builder_add(priv->builder, "v",
+                              serialize_boxed_default(self, ref));
+    }
+    else
+    {
+        g_assert_not_reached();
+    }
 
     /* Close the tuple we just opened */
     g_variant_builder_close(priv->builder);
 }
 
 static gsize
-push_entity(GvsSerializer *self, gpointer entity, GType entity_type)
+push_entity(GvsSerializer *self, const GValue *value)
 {
     GvsSerializerPrivate *priv = self->priv;
 
-    EntityRef *ref = entity_ref(entity_type, priv->num_entities++);
+    EntityRef *ref = make_entity_ref(priv->num_entities++, value);
     
-    g_hash_table_insert(priv->entity_map, entity, ref);
+    g_hash_table_insert(priv->entity_map, g_value_peek_pointer(value), ref);
 
-    g_queue_push_head(&priv->queue, entity);
+    g_queue_push_head(&priv->queue, ref);
 
     return ref->id;
 }
 
-static gpointer
+static EntityRef *
 pop_entity(GvsSerializer *self)
 {
     return g_queue_pop_tail(&self->priv->queue);
 }
 
 static GVariant *
-get_entity_ref(GvsSerializer *self, gpointer entity, GType entity_type)
+get_entity_ref(GvsSerializer *self, const GValue *value)
 {
     GvsSerializerPrivate *priv = self->priv;
     gsize entity_id = 0;
+    gpointer ptr = g_value_peek_pointer(value);
 
     /* If we have this entity already, returns its reference */
-    if (g_hash_table_contains(priv->entity_map, entity))
+    if (g_hash_table_contains(priv->entity_map, ptr))
     {
-        EntityRef *ref = g_hash_table_lookup(priv->entity_map, entity);
+        EntityRef *ref = g_hash_table_lookup(priv->entity_map, ptr);
         entity_id = ref->id;
     }
     else
     {
-        entity_id = push_entity(self, entity, entity_type);
+        entity_id = push_entity(self, value);
     }
 
     return g_variant_new_uint64(entity_id);
@@ -384,6 +457,7 @@ gvs_serializer_serialize_object(GvsSerializer *self, GObject *object)
     GvsSerializerPrivate *priv;
     GVariant *variant = NULL;
     GVariant *array = NULL;
+    GValue val = G_VALUE_INIT;
 
     g_return_val_if_fail(GVS_IS_SERIALIZER(self), NULL);
     g_return_val_if_fail(G_IS_OBJECT(object), NULL);
@@ -395,10 +469,13 @@ gvs_serializer_serialize_object(GvsSerializer *self, GObject *object)
                                              NULL, entity_ref_free);
     g_queue_init(&priv->queue);
 
-    push_entity(self, object, G_TYPE_FROM_INSTANCE(object));
+    g_value_init(&val, G_TYPE_FROM_INSTANCE(object));
+    g_value_set_object(&val, object);
+
+    push_entity(self, &val);
 
     {
-        gpointer e = NULL;
+        EntityRef *e = NULL;
 
         while ((e = pop_entity(self)) != NULL)
         {
@@ -413,6 +490,7 @@ gvs_serializer_serialize_object(GvsSerializer *self, GObject *object)
                             GVS_PROTOCOL_VERSION,
                             array);
 
+    g_value_reset(&val);
     g_hash_table_destroy(priv->entity_map);
     g_variant_builder_unref(priv->builder);
 

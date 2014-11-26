@@ -60,18 +60,20 @@ static gpointer get_entity(GvsDeserializer *self, gsize id);
 static void
 strv_deserialize(GvsDeserializer *self, GVariant *variant, GValue *value, gpointer unused)
 {
-    g_value_set_boxed(value, g_variant_get_strv(variant, NULL));
+    char **strings = g_variant_dup_strv (variant, NULL);
+    g_value_take_boxed(value, strings);
+    //g_free (strings);
 }
 
 static void
 gbytes_deserialize(GvsDeserializer *self, GVariant *variant, GValue *value, gpointer unused)
 {
-    gsize length;
-    char *data = g_variant_dup_bytestring(variant, &length);
-    GBytes *bytes = g_bytes_new_take(data, length);
-    g_value_set_boxed(value, bytes);
+    /* g_variant_get_bytestring() doesn't handle embedded NULs, so instead we
+     * just grab the raw data.
+     * FIXME: Need to test whether the refcounting is right here */
+    GBytes *bytes = g_variant_get_data_as_bytes (variant);
+    g_value_take_boxed (value, bytes);
 }
-
 
 typedef struct
 {
@@ -98,6 +100,25 @@ lookup_builtin_transform(GType type)
 
     return NULL;
 }
+
+static void
+deserialize_boxed(GvsDeserializer *self, GVariant *variant, GValue *value, gpointer unused)
+{
+    GVariant *child = g_variant_get_maybe(variant);
+
+    if (child)
+    {
+        gsize child_id = g_variant_get_uint64(child);
+        g_value_take_boxed(value, get_entity(self, child_id));
+    }
+    else
+    {
+        g_value_set_boxed(value, NULL);
+    }
+  
+    g_variant_unref (child);
+}
+
 
 /*
  *
@@ -134,7 +155,7 @@ deserialize_fundamental(GvsDeserializer *self, GVariant *variant, GValue *value,
         {
             char *str = NULL;
             g_variant_get(variant, "ms", &str);
-            g_value_set_string(value, str);
+            g_value_take_string(value, str);
             break;
         }
         case G_TYPE_UCHAR:
@@ -175,8 +196,6 @@ deserialize_flags(GvsDeserializer *self, GVariant *variant, GValue *value, gpoin
 {
     g_value_set_flags(value, g_variant_get_uint32(variant));
 }
-
-
 
 /*
  *
@@ -240,13 +259,13 @@ deserialize_pspec(GvsDeserializer *self, GParamSpec *pspec, GVariant *variant, G
         }
         else
         {
-            func = lookup_builtin_transform(type)->deserialize;
+            func = deserialize_boxed;
         }
     }
 
     if (func)
     {
-        g_value_init(value, type);
+        g_value_init (value, type);
         func(self, variant, value, NULL);
     }
     else
@@ -356,16 +375,36 @@ static void
 deserialize_entity(GvsDeserializer *self, gsize index)
 {
     GvsDeserializerPrivate *priv = self->priv;
+    char *gtype_str = NULL;
+    GType gtype;
     GVariant *child;
-    gpointer object = priv->entities[index];
+    gpointer entity = priv->entities[index];
 
-    g_assert(object);
+    g_assert (entity);
 
     /* Grab the nth entry from the toplevel */
-    g_variant_get_child(priv->toplevel, index, "(sv)", NULL, &child);
+    g_variant_get_child(priv->toplevel, index, "(sv)", &gtype_str, &child);
+  
+    if (gtype_str == NULL)
+    {
+        g_critical("Could not read GType string from serialized object");
+        goto out;
+    }
 
-    gvs_deserialize_object_default(self, object, child);
+    gtype = g_type_from_name(gtype_str);
 
+    if (gtype == 0)
+    {
+        g_critical("Type name \"%s\" is not registered with GType", gtype_str);
+        goto out;
+    }
+
+    /* Only GObjects need two-stage deserialization */
+    if (g_type_is_a (gtype, G_TYPE_OBJECT))
+    	gvs_deserialize_object_default(self, entity, child);
+
+out:
+    g_free (gtype_str);
     g_variant_unref(child);
 }
 
@@ -376,7 +415,7 @@ create_entity(GvsDeserializer *self, gsize index)
     char *gtype_str;
     GType gtype;
     GVariant *child;
-    gpointer object = NULL;
+    gpointer entity = NULL;
 
     /* Grab the nth entry from the toplevel */
     g_variant_get_child(priv->toplevel, index, "(sv)", &gtype_str, &child);
@@ -395,20 +434,29 @@ create_entity(GvsDeserializer *self, gsize index)
         goto out;
     }
 
-    g_assert(g_type_is_a(gtype, G_TYPE_OBJECT));
-
     /* TODO: Handle other entity types here, and GvsSerializable etc */
-    object = gvs_create_object_default(self, gtype, child);
+    if (g_type_is_a(gtype, G_TYPE_OBJECT))
+    {
+        entity = gvs_create_object_default(self, gtype, child);
+    }
+    else if (g_type_is_a(gtype, G_TYPE_BOXED))
+    {
+        const BuiltinTransform *transform = lookup_builtin_transform(gtype);
+        GValue value = G_VALUE_INIT;
+        g_value_init(&value, gtype);
+        transform->deserialize(self, child, &value, NULL);
+        entity = g_value_get_boxed(&value);
+    }
 
-    g_assert(object);
+    g_assert(entity);
 
-    priv->entities[index] = object;
+    priv->entities[index] = entity;
 
 out:
     g_free(gtype_str);
     g_variant_unref(child);
 
-    return object;
+    return entity;
 }
 
 
