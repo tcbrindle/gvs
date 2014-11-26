@@ -57,7 +57,7 @@ appropriate GVariant type according to the following table:
 
 C Type          | GType           | GVariant type 
 --------------- | --------------- | -------------
-`gboolean`      | `G_TYPE_BOOLEAN | `b`
+`gboolean`      | `G_TYPE_BOOLEAN`| `b`
 `int`           | `G_TYPE_INT`    | `i`
 `unsigned`      | `G_TYPE_UINT`   | `u`
 `int64_t`       | `G_TYPE_INT64`  | `x`
@@ -93,7 +93,7 @@ serialize the following built-in types:
 
 C Type          | GType           | GVariant type 
 --------------- | --------------- | -------------
-`GBytes*`       | `G_TYPE_BYTES   | `ay`
+`GBytes*`       | `G_TYPE_BYTES`  | `ay`
 `GStrv`         | `G_TYPE_STRV`   | `as`
 
 (This list is likely to be expanded in future.)
