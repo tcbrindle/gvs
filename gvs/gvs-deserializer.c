@@ -191,7 +191,7 @@ deserialize_object(GvsDeserializer *self, GVariant *variant, GValue *value, gpoi
     if (child)
     {
         gsize child_id = g_variant_get_uint64(child);
-        g_value_take_object(value, get_entity(self, child_id));
+        g_value_set_object(value, get_entity(self, child_id));
     }
     else
     {
@@ -292,6 +292,8 @@ gvs_deserialize_object_default(GvsDeserializer *self,
             deserialize_pspec(self, pspec, prop_var, &value);
 
             g_object_set_property(object, prop_name, &value);
+          
+            g_value_unset (&value);
         }
 
         g_variant_unref(prop_var);
